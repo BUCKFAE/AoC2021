@@ -1,4 +1,3 @@
-import sys
 from collections import Counter
 
 puzzle_input = []

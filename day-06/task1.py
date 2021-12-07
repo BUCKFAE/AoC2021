@@ -1,5 +1,3 @@
-import sys
-
 puzzle_input = []
 
 with open("day-06/input.txt") as f:
