@@ -1,6 +1,3 @@
-from os import pathconf
-import time
-import sys
 from typing import List, Dict
 puzzle_input = []
 
