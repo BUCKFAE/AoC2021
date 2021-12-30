@@ -1,4 +1,7 @@
-from collections import Counter
+from os import pathconf
+import time
+import sys
+from typing import List, Dict
 puzzle_input = []
 
 with open("day-12/input.txt") as f:
@@ -37,53 +40,79 @@ print("Small caves: {}".format(small_caves))
 print("Big caves: {}".format(big_caves))
 print("Paths: {}".format(paths))
 
-cave_paths = []
-
-sub = []
-
-# TODO: This has to be a dynamic program, otherwise it will take forever
-def extend_path(path):
-    new_paths = []
-    print(f"Extending path: {path}, cave: \"{path[-1]}\"")
+class Path:
+    def __init__(self, path: List[str], lower_visited: Dict[str, int] = {}, lower_visited_twice: bool = False):
+        self.path = path
+        self.lower_visited = lower_visited
+        self.lower_visited_twice = lower_visited_twice
     
-    # Creating all possible paths
-    for possible_cave in paths.get(path[-1], []):
+    def can_extend_path(self, cave: str) -> bool:
+        if cave == 'start':
+            return False
+        if cave == 'end':
+            return True 
 
-        counts = Counter([c for c in path if c.islower()])
+        # Big caves can be visited as often as we like
+        if cave.isupper():
+            return True
 
-        # Visiting either big or unknown caves
-        if possible_cave.isupper() or counts[possible_cave] == 0:
-            new_paths.append(path + [possible_cave])
+        # How often we visited this small cave
+        visited = self.lower_visited.get(cave, 0)
+        if visited > 0 and self.lower_visited_twice:
+            return False
         
-        if counts[possible_cave] < 2:
-            if all([counts[c] < 2 for c in [c for c in path if c.islower() and c != possible_cave]]):
-                new_paths.append(path + [possible_cave])
-    
+        return True
 
-    if len(new_paths) == 0:
-        return []
+    def extend_path(self, cave: str):
+        assert self.can_extend_path(cave)
+        
+        if cave.islower():
+            self.lower_visited[cave] = self.lower_visited.get(cave, 0) + 1
+            if self.lower_visited[cave] > 1:
+                self.lower_visited_twice = True
 
-    # Recursively extending paths
-    for new_path in new_paths:
+        self.path.append(cave)
 
-        if sum([1 if cave == "end" else 0 for cave in new_path]) == 0 and sum([1 if cave == "start" else 0 for cave in new_path]) == 1:
+    def get_last_cave(self) -> str:
+        return self.path[-1]
 
-            if ".".join(new_path) not in sub:
+    def copy_path(self):
+        return Path(self.path.copy(), lower_visited=self.lower_visited.copy(), lower_visited_twice=self.lower_visited_twice)
+
+    def __repr__(self) -> str:
+        return ' - '.join(self.path)
+
+current_paths: List[Path] = [Path(['start'])]
+finished_paths: List[Path] = []
+
+while len(current_paths) > 0:
+
+    new_paths: List[Path] = []
+
+    for p in current_paths:
+
+
+        # Getting the last cave of the path
+        last_cave = p.get_last_cave()
+
+        # All caves we can reach from the last cave
+        possible_next_caves = paths[last_cave]
+
+        # All possible continuations of that path
+        for next_cave in possible_next_caves:
+
+            if next_cave == 'end':
+                path_copy = p.copy_path()
+                path_copy.extend_path(next_cave)
+                finished_paths.append(path_copy)
+
+            elif p.can_extend_path(next_cave):
+                path_copy = p.copy_path()
+                path_copy.extend_path(next_cave)
+                new_paths.append(path_copy)
                 
-                sub.append(".".join(new_path))
-                cave_paths.extend(extend_path(new_path))
+    current_paths = [p.copy_path() for p in new_paths]
+    new_paths.clear()
 
-    return new_paths
-
-
-cave_paths += extend_path(["start"])
-
-cave_paths = list(sorted(set([",".join(path) for path in cave_paths if len(path) > 0])))
-print(cave_paths)
-cave_paths = [p for p in cave_paths if p.endswith("end")]
-
-print(cave_paths)
-print(len(cave_paths))
-for path in cave_paths:
-    print(path)
-print(len(cave_paths))
+print('\n'.join([str(p) for p in finished_paths]))
+print(len(finished_paths))
