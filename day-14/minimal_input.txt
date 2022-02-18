@@ -16,3 +16,13 @@ BB -> N
 BC -> B
 CC -> N
 CN -> C
+
+AB -> C
+
+A - C - BBC
+AC + CB  - C = AB
+
+    A  B C 
+A   {AA} {A B (C)} {A C}
+B
+C
