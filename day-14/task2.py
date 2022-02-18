@@ -1,3 +1,4 @@
+from audioop import add
 from dataclasses import dataclass
 from operator import ne
 import re
@@ -30,54 +31,80 @@ print(f'Rules: {rules}')
 
 conversions = {}
 
-def handle_unknown_tuple(segment):
+def handle_tuple(segment):
     print(f'\t\tHandling tuple: {segment}')
 
-    segment_from_rules = []
+    segments_from_rules = []
 
     for rule in rules:
         if rule.h1 == segment[0] and rule.h2 == segment[1]:
-            segment_from_rules.append(f'{segment[0]}{rule.res}{segment[1]}')
+            segments_from_rules.append(f'{segment[0]}{rule.res}{segment[1]}')
 
     # No rules apply
-    if not segment_from_rules:
-        segment_from_rules = [segment]
+    if not segments_from_rules:
+        segments_from_rules = [segment]
 
-    conversions[segment] = (segment_from_rules, {c: segment.count(c) for c in segment})
-    print(f'\t\tTuple from rules:\n\t\t\t' + '\n\t\t\t'.join(segment_from_rules))
+    conversions[segment] = (segments_from_rules, {c: segment.count(c) for c in segment})
+    print(f'\t\tTuple from rules:\n\t\t\t' + '\n\t\t\t'.join(segments_from_rules))
     print(f'\t\tAdded conversion: {conversions[segment]}')
 
-def handle_segment(start, end):
-    """
-    1. Iteration: AB
-    2. Iteration: ABB
-    3. Iteration: ABBC
-    """
+    return conversions[segment][0]
 
-    segment = polymer_template[start:end]
-    print(f'Handling  segment: {segment}')
 
-    known_segment = polymer_template[start:end -1]
 
-    # Finding the biggest known segment
-    known_segment_end = id
+
+def handle_segment(segment, height = 0):
+
+    # Skipping if the segment is already known
+    if segment in conversions.keys():
+        print(f'\tSegment is already known ({segment})')
+        return
+
+    # Skipping if the segment length is longer than 
+    if len(segment) > 2 ** 40:
+        print(f'Segment to long!')
+        return
+
+    added_conversions = []
+
+    for start in range(len(segment) - 1):
+
+        current_tuple = segment[start:start + 2]
+        print(f'\tCurrent tuple: {current_tuple}')
+        
+        tuple_conversions = handle_tuple(current_tuple)
+        added_conversions += tuple_conversions
+
+    print(f'Added Conversions: {added_conversions}')
+
+    char_count = {}
+    for current_conversion in added_conversions:
+        print(f'{current_conversion=}')
+        for conversion_char in current_conversion:
+            char_count[conversion_char] = char_count.get(conversion_char, 0) + current_conversion.count(conversion_char) 
+
+    for c in segment:
+        char_count[c] = char_count.get(c, 0) + segment.count(c)
+
+    conversions[segment] = (added_conversions, char_count)
+
+    for c in added_conversions:
+        handle_segment(c)
+
 
 for idx in range(len(polymer_template) - 1):
 
     print(f'{idx:02} / {len(polymer_template) - 1:02}: {polymer_template}')
     print(' ' * 9 + ' ' * idx +  '^')
 
-    # Finding the biggest window
-    window_end = idx + 2
-    while True:
-        window_word = polymer_template[idx:window_end]
-        if window_word not in conversions.keys():
-            break
-        else:
-            window_end += 1
+    window_word = polymer_template[0:idx + 2]
 
-    print(f'\tCurrent window: {window_word} ({idx} - {window_end})')
+    print(f'\tCurrent window: {window_word} ({idx} - {idx + 2})')
     handle_segment(window_word)
+
+print(conversions)
+print('---------------')
+print(conversions[polymer_template])
 
 sys.exit(1)
 
