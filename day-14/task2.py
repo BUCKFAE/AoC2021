@@ -1,9 +1,9 @@
 from audioop import add
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from operator import ne
 import re
 import sys
-from typing import List
+from typing import List, Optional, Dict
 
 puzzle_input = []
 
@@ -20,6 +20,14 @@ class Rule:
     h2: str
     res: str
 
+@dataclass
+class Conversion:
+    initial_segment: str
+    resulting_segments: List[str]
+    depth: int = field(hash=False)
+    char_count: Dict[str, int]
+
+
 # Loading rules
 rules: List[Rule] = []
 for rule in rule_strings:
@@ -29,35 +37,42 @@ for rule in rule_strings:
 
 print(f'Rules: {rules}')
 
-conversions = {}
+conversions: List[Conversion] = [] 
 
-def handle_tuple(segment):
+def add_conversion(conversion: Conversion) -> bool:
+    existing = [c for c in conversions if c == conversion]
+    assert len(existing) < 2
+    if len(existing) == 0:
+        conversions.append(conversion)
+
+
+def handle_tuple(segment, depth) -> Optional[Conversion]:
     print(f'\t\tHandling tuple: {segment}')
 
-    segments_from_rules = []
+    segments_from_rules = segment
 
     for rule in rules:
         if rule.h1 == segment[0] and rule.h2 == segment[1]:
-            segments_from_rules.append(f'{segment[0]}{rule.res}{segment[1]}')
+            segments_from_rules = f'{segment[0]}{rule.res}{segment[1]}'
 
-    # No rules apply
-    if not segments_from_rules:
-        segments_from_rules = [segment]
+    if segments_from_rules == segment:
+        return None
 
-    conversions[segment] = (segments_from_rules, {c: segment.count(c) for c in segment})
-    print(f'\t\tTuple from rules:\n\t\t\t' + '\n\t\t\t'.join(segments_from_rules))
-    print(f'\t\tAdded conversion: {conversions[segment]}')
-
-    return conversions[segment][0]
+    char_count = {c:segment.count(c) for c in segment}
+    new_conversion = Conversion(segment, segments_from_rules, depth + 1, char_count)
+    add_conversion(new_conversion)
+    return new_conversion
 
 
 
 
-def handle_segment(segment, height = 0):
+def handle_segment(segment, depth = 0):
 
     # Skipping if the segment is already known
-    if segment in conversions.keys():
-        print(f'\tSegment is already known ({segment})')
+    existing = [c for c in conversions if c.initial_segment == segment and c.depth <= depth]
+    assert len(existing) < 2, f'{segment}'
+    if len(existing) == 1:
+        print(f'Segment is already known, returning')
         return
 
     # Skipping if the segment length is longer than 
@@ -66,30 +81,29 @@ def handle_segment(segment, height = 0):
         return
 
     added_conversions = []
+    last_end = 0
 
-    for start in range(len(segment) - 1):
+    for current_end in range(1, len(segment)):
+        window = segment[last_end: current_end + 1]
+        print(f'\tSubwindow: {window}')
+        if len([c for c in conversions if c.initial_segment == window]) == 0:
+            print(f'Found unkown window')
+            last = window[:]
+            print(f'Last: {last}')
+            tupe_res = handle_tuple(last, depth)
+            added_conversions += [tupe_res]
 
-        current_tuple = segment[start:start + 2]
-        print(f'\tCurrent tuple: {current_tuple}')
-        
-        tuple_conversions = handle_tuple(current_tuple)
-        added_conversions += tuple_conversions
+
+    cons = []
 
     print(f'Added Conversions: {added_conversions}')
-
-    char_count = {}
-    for current_conversion in added_conversions:
-        print(f'{current_conversion=}')
-        for conversion_char in current_conversion:
-            char_count[conversion_char] = char_count.get(conversion_char, 0) + current_conversion.count(conversion_char) 
-
-    for c in segment:
-        char_count[c] = char_count.get(c, 0) + segment.count(c)
-
-    conversions[segment] = (added_conversions, char_count)
-
-    for c in added_conversions:
-        handle_segment(c)
+    for added_conversion in added_conversions:
+        for res in added_conversion.resulting_segments:
+            handle_segment(res)
+            cons += [res]
+    
+    new_con = Conversion(segment, cons, depth + 1, {})    
+    add_conversion(new_con) 
 
 
 for idx in range(len(polymer_template) - 1):
@@ -99,58 +113,10 @@ for idx in range(len(polymer_template) - 1):
 
     window_word = polymer_template[0:idx + 2]
 
-    print(f'\tCurrent window: {window_word} ({idx} - {idx + 2})')
-    handle_segment(window_word)
+    print(f'Current window: {window_word} ({idx} - {idx + 2})')
+    handle_segment(window_word, idx)
 
-print(conversions)
+conversions.sort(key=lambda c: c.initial_segment)
+print('\n'.join([str(c) for c in conversions]))
 print('---------------')
-print(conversions[polymer_template])
-
-sys.exit(1)
-
-for idx in range(40):
-    print(f'Current iteration: {idx}')
-
-    to_insert = {}
-
-    for id, c in enumerate(polymer_template):
-        if id == len(polymer_template) - 1:
-            break
-        possible_rules = rule_map.get(c, {})
-        rule = possible_rules.get(polymer_template[id + 1], None)
-        if rule is None:
-            continue
-        to_insert[id + 1 + len(to_insert.keys())] = rule
-        
-    #print(to_insert)
-
-    for pos, value in to_insert.items():
-        polymer_template = polymer_template[:pos] + value + polymer_template[pos:]
-
-    #print(polymer_template)
-
- #   print(idx)
-    #assert idx != 0 or polymer_template == 'NCNBCHB', polymer_template
-
-
-    if idx == 13:
-        print(len(polymer_template))  
-
-        o = {}
-        for i in range(len(polymer_template) - 4):
-            t = polymer_template[i:i+4]
-            print(t)
-            o[t] = o.get(t, 0) + 1
-        print(o)
-
-        sys.exit(1)
-
-print(f'Polymer: {polymer_template}')
-print(len(polymer_template))
-
-frequency = {c : polymer_template.count(c) for c in polymer_template}
-print(frequency)
-
-res = max(frequency.values()) - min(frequency.values())
-
-print(f'Result: {res}')
+print([c for c in conversions if c.initial_segment == polymer_template][0])
