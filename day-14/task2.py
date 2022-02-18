@@ -1,4 +1,5 @@
 from audioop import add
+from collections import Counter
 from dataclasses import dataclass, field
 from operator import ne
 import re
@@ -7,7 +8,7 @@ from typing import List, Optional, Dict
 
 puzzle_input = []
 
-with open("day-14/minimal_input.txt") as f:
+with open("day-14/input.txt") as f:
     file_content = [line.strip() for line in f.readlines() if line.strip()]
     polymer_template = file_content[0]
     rule_strings = file_content[1:]
@@ -28,95 +29,50 @@ class Conversion:
     char_count: Dict[str, int]
 
 
-# Loading rules
+# Loading rules and alphabet
 rules: List[Rule] = []
+alphabet = set()
 for rule in rule_strings:
     head, res = rule.split(' -> ')
+    [alphabet.add(c) for c in head + res]
     h1, h2 = [c for c in head]
     rules.append(Rule(h1, h2, res))
 
 print(f'Rules: {rules}')
+print(f'Alphabet: {alphabet}')
 
-conversions: List[Conversion] = [] 
+def create_table(base_case = True):
+    table = {}
+    for c1 in alphabet:
+        table[c1] = {} 
+        for c2 in alphabet:
+            table[c1][c2] = Counter([c1, c2] if base_case else [])
+    return table
 
-def add_conversion(conversion: Conversion) -> bool:
-    existing = [c for c in conversions if c == conversion]
-    assert len(existing) < 2
-    if len(existing) == 0:
-        conversions.append(conversion)
+table = create_table()
 
+print(table)
 
-def handle_tuple(segment, depth) -> Optional[Conversion]:
-    print(f'\t\tHandling tuple: {segment}')
-
-    segments_from_rules = segment
-
+for step in range(40):
+    new_table = create_table(base_case=False)
     for rule in rules:
-        if rule.h1 == segment[0] and rule.h2 == segment[1]:
-            segments_from_rules = f'{segment[0]}{rule.res}{segment[1]}'
+        t1 = table[rule.h1][rule.res]
+        t2 = table[rule.res][rule.h2]
+        n = t1 + t2 - Counter([rule.res])
+        new_table[rule.h1][rule.h2] = n
+    table = new_table
 
-    if segments_from_rules == segment:
-        return None
-
-    char_count = {c:segment.count(c) for c in segment}
-    new_conversion = Conversion(segment, segments_from_rules, depth + 1, char_count)
-    add_conversion(new_conversion)
-    return new_conversion
-
-
-
-
-def handle_segment(segment, depth = 0):
-
-    # Skipping if the segment is already known
-    existing = [c for c in conversions if c.initial_segment == segment and c.depth <= depth]
-    assert len(existing) < 2, f'{segment}'
-    if len(existing) == 1:
-        print(f'Segment is already known, returning')
-        return
-
-    # Skipping if the segment length is longer than 
-    if len(segment) > 2 ** 40:
-        print(f'Segment to long!')
-        return
-
-    added_conversions = []
-    last_end = 0
-
-    for current_end in range(1, len(segment)):
-        window = segment[last_end: current_end + 1]
-        print(f'\tSubwindow: {window}')
-        if len([c for c in conversions if c.initial_segment == window]) == 0:
-            print(f'Found unkown window')
-            last = window[:]
-            print(f'Last: {last}')
-            tupe_res = handle_tuple(last, depth)
-            added_conversions += [tupe_res]
-
-
-    cons = []
-
-    print(f'Added Conversions: {added_conversions}')
-    for added_conversion in added_conversions:
-        for res in added_conversion.resulting_segments:
-            handle_segment(res)
-            cons += [res]
-    
-    new_con = Conversion(segment, cons, depth + 1, {})    
-    add_conversion(new_con) 
-
-
+sum = Counter()
 for idx in range(len(polymer_template) - 1):
+    t = polymer_template[idx:idx+2]
+    res = table[t[0]][t[1]]
+    sum += res - Counter(t[1])
 
-    print(f'{idx:02} / {len(polymer_template) - 1:02}: {polymer_template}')
-    print(' ' * 9 + ' ' * idx +  '^')
+sum += Counter([polymer_template[-1]])
 
-    window_word = polymer_template[0:idx + 2]
+print(f'{sum=}')
+l = sum.most_common()
+# print(l)
+print(l[0][1] - l[-1][1])
 
-    print(f'Current window: {window_word} ({idx} - {idx + 2})')
-    handle_segment(window_word, idx)
 
-conversions.sort(key=lambda c: c.initial_segment)
-print('\n'.join([str(c) for c in conversions]))
-print('---------------')
-print([c for c in conversions if c.initial_segment == polymer_template][0])
